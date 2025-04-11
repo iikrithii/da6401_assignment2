@@ -1,6 +1,6 @@
 import pprint
 import wandb
-from train import main
+from partA.main import main
                         
 sweep_config = {
         'method': 'bayes',

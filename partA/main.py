@@ -10,7 +10,7 @@ from pathlib import Path
 from pytorch_lightning.callbacks import RichProgressBar
 from pytorch_lightning.callbacks import Callback
 import pprint
-
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 
 class EpochLoggerCallback(Callback):
@@ -25,7 +25,15 @@ def train_model(config, wandb_logger):
     # Set seed for reproducibility
     seed_everything(42)
 
-    data_dir = Path(__file__).parent.parent.parent / "data"
+    early_stop_callback = EarlyStopping(
+    monitor="val_loss",
+    min_delta=0.00,
+    patience=7,
+    verbose=True,
+    mode="min"
+    )
+
+    data_dir = "/home/gokul/LLM-Distillation/wino/DLAssign2/data"
     
     data_loader = INaturalistDataLoader(data_dir=data_dir,
                                          batch_size=config.batch_size,
@@ -53,15 +61,15 @@ def train_model(config, wandb_logger):
         max_epochs=config.epochs,
         logger=wandb_logger,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        devices="auto",
+        devices=1,
         strategy="auto",
         enable_checkpointing=True,
-        callbacks=[RichProgressBar(), EpochLoggerCallback()]
+        callbacks=[RichProgressBar(), EpochLoggerCallback(), early_stop_callback]
     )
     trainer.fit(model, data_loader)
     
     save_name = (
-        f"save/"
+        f"partA/save/"
         f"bs_{config.batch_size}_"
         f"epochs_{config.epochs}_"
         f"aug_{int(config.use_aug)}_"
@@ -77,29 +85,51 @@ def train_model(config, wandb_logger):
     )
     trainer.save_checkpoint(save_name)
 
-def test_model(config):
+def test_model(config, filename =None):
+
+    if filename==None:
+        filename = (
+        f"save/"
+        f"bs_{config.batch_size}_"
+        f"epochs_{config.epochs}_"
+        f"aug_{int(config.use_aug)}_"
+        f"bn_{int(config.use_batchnorm)}_"
+        f"filters_{'-'.join(map(str, config.num_filters))}_"
+        f"conv_act_{config.conv_activation}_"
+        f"dense_{config.dense_neurons}_"
+        f"dense_act_{config.dense_activation}_"
+        f"drop_{config.dropout_rate}_"
+        f"lr_{config.lr}_"
+        f"optim_{config.optimizer}_"
+        f"best_model.ckpt"
+        )
+    
+    
     # Load the best model checkpoint
-    model = CNNModel.load_from_checkpoint("save/best_model.ckpt")
+    model = CNNModel.load_from_checkpoint(filename, strict=False)
     
     # Prepare data module
-    data_loader = INaturalistDataLoader(data_dir=config.data_dir,
-                                         batch_size=config.batch_size,
-                                         img_size=config.img_size)
-    data_loader.setup()
-    
+    datamodule = INaturalistDataLoader(
+        data_dir=config.data_dir,
+        batch_size=config.batch_size,
+        img_size=config.img_size,
+        use_aug=False  
+    )
+    datamodule.setup()
+
     # Evaluate on test data
     trainer = Trainer(
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         devices="auto"
     )
-    results = trainer.test(model, data_loader)
+    results = trainer.test(model, datamodule)
     print("Test results:", results)
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="DA6401 Assignment 2 - Part A")
     parser.add_argument("-m", "--mode", type=str, default="train", choices=["train", "test"],
                         help="Run mode: train or test")
-    parser.add_argument("-dd", "--data_dir", type=str, default="../data",
+    parser.add_argument("-dd", "--data_dir", type=str, default="/home/gokul/LLM-Distillation/wino/DLAssign2/data",
                         help="Path to the data directory")
     parser.add_argument("-img", "--img_size", type=int, default=256, help="Resized Image size for training/testing")
     parser.add_argument("-wp", "--wandb_project", type=str, default="DA6401_Assignment2", 
@@ -111,21 +141,23 @@ def parse_arguments():
     parser.add_argument("-f", "--num_filters", type=int, nargs='+', default=[32, 32, 32, 32, 32],
                         help="List of filters for each conv layer")
     parser.add_argument("-k", "--kernel_size", type=int, default=3, help="Kernel size for conv layers")
-    parser.add_argument("-a", "--activation", type=str, default="relu", help="Activation function for conv layers")
+    parser.add_argument("-ca", "--conv_activation", type=str, default="relu", help="Activation function for conv layers")
+    parser.add_argument("-da", "--dense_activation", type=str, default="relu", help="Activation function for dense layers")
     parser.add_argument("-d", "--dense_neurons", type=int, default=128, help="Number of neurons in the dense layer")
     parser.add_argument("-dr", "--dropout_rate", type=float, default=0.0, help="Dropout rate after conv layers")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--optimizer", type=str, default="adam", choices=["adam", "sgd", "rmsprop"],
+    parser.add_argument("--optimizer", type=str, default="adam", choices=["adam", "sgd", "rmsprop", "adamw", "nadam"],
                         help="Optimizer choice: adam, sgd or rmsprop")
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay for optimizer")
-    parser.add_argument("--use_aug", type=bool, default=False, help="Use data augmentation (default: False)")
-    parser.add_argument("--use_batchnorm", type=bool, default=False, help="Use batch normalization (default: False)")
+    parser.add_argument("--use_aug", type=bool, default=True, help="Use data augmentation (default: False)")
+    parser.add_argument("--use_batchnorm", type=bool, default=True, help="Use batch normalization (default: False)")
+    parser.add_argument("-tf","--load_file", type=str, default=None, help="Load the file for testing trained model")
 
     args = parser.parse_args()
     return args
+ 
 
-
-def main():
+if __name__ == "__main__":
 
     args = parse_arguments()
     wandb.init(project=args.wandb_project, entity=args.wandb_entity, config=vars(args))
@@ -154,76 +186,76 @@ def main():
     if args.mode == "train":
         train_model(config, wandb_logger)
     elif args.mode == "test":
-        test_model(config)
+        test_model(config, args.load_file)
     
     wandb.finish() 
 
 
-if __name__ == "__main__":
-    sweep_config = {
-        'method': 'bayes',
-        'early_terminate': {
-            'type': 'hyperband',
-            'min_iter': 5,  
-            'max_iter': 10,  
-            'eta': 2,
-        },
-        'metric': {
-            'name': 'val_acc',  
-            'goal': 'maximize'
+# if __name__ == "__main__":
+#     main()
+    # sweep_config = {
+    #     'method': 'bayes',
+    #     # 'early_terminate': {
+    #     #     'type': 'hyperband',
+    #     #     'min_iter': 5,  
+    #     #     'max_iter': 10,  
+    #     #     'eta': 2,
+    #     # },
+    #     'metric': {
+    #         'name': 'val_acc',  
+    #         'goal': 'maximize'
 
-        },
-        'parameters': {
-            'epochs': {
-                'values': [10]
-            },
-            'num_filters': {
-                'values': [[32, 32, 32, 32, 32], [64, 64, 64, 64, 64], [32, 64, 128, 256, 512]]
-            },
+    #     },
+    #     'parameters': {
+    #         'epochs': {
+    #             'values': [30]   
+    #         },
+    #         'num_filters': {
+    #             'values': [[64, 64, 64, 64, 64], [32, 64, 128, 256, 512]]
+    #         },
 
-            'dense_neurons': {
-                'values': [128, 256]
-            },
-            'dropout_rate': {
-                'min': 0.0, 
-                'max': 0.5,
-            },
-            'kernel_size': {
-                'values': [3, 5]
-            },
-            'lr': {
-                'min': 1e-5,
-                'max': 1e-3,
-            },
-            'batch_size': {
-                'values': [16, 32, 64, 128]
-            },
-            'conv_activation': {
-                'values': ['relu', 'gelu', 'silu', 'mish']
-            },
-            'dense_activation': {
-                'values': ['relu', 'gelu']
-            },
-            'use_aug': {
-                'values': [True, False]
-            },
-            'use_batchnorm': {
-                'values': [True, False]
-            },
-            "weight_decay": {
-             "values": [0.0, 0.0001, 0.001]
-            },
-            "optimizer": {
-                "values": ["adam", "sgd", "nadam", "adamw"]
-            }
-        }
-    }
+    #         'dense_neurons': {
+    #             'values': [256, 512]
+    #         },
+    #         'dropout_rate': {
+    #             'min': 0.0, 
+    #             'max': 0.1,
+    #         },
+    #         'kernel_size': {
+    #             'values': [3, 5]
+    #         },
+    #         'lr': {
+    #             'min': 1e-5,
+    #             'max': 4e-4,
+    #         },
+    #         'batch_size': {
+    #             'values': [16, 32, 64]
+    #         },
+    #         'conv_activation': {
+    #             'values': ['gelu', 'silu', 'mish']
+    #         },
+    #         'dense_activation': {
+    #             'values': ['relu', 'gelu']
+    #         },
+    #         'use_aug': {
+    #             'values': [True, False]
+    #         },
+    #         'use_batchnorm': {
+    #             'values': [True]
+    #         },
+    #         "weight_decay": {
+    #          "values": [0.001]
+    #         },
+    #         "optimizer": {
+    #             "values": ["nadam", "adamw"]
+    #         }
+    #     }
+    # }
+    # pprint.pprint(sweep_config)
 
-    pprint.pprint(sweep_config)
-
-    # Create the sweep – make sure to specify your wandb project and entity
+    # # Create the sweep – make sure to specify your wandb project and entity
     # sweep_id = wandb.sweep(sweep_config, project="DA6401_Assignment2", entity="ns25z040-indian-institute-of-technology-madras")
     # print("Sweep ID:", sweep_id)
-    sweep_id= "redi2h5e"
-    # Run the sweep agent, which calls your main training function
-    wandb.agent(sweep_id, function=main, project="DA6401_Assignment2", entity="ns25z040-indian-institute-of-technology-madras")
+    # # sweep_id= "k4b46277"
+    # # Run the sweep agent, which calls your main training function
+    # wandb.agent(sweep_id, function=main, project="DA6401_Assignment2", entity="ns25z040-indian-institute-of-technology-madras")

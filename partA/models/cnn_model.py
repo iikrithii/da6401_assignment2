@@ -109,6 +109,16 @@ class CNNModel(pl.LightningModule):
         self.log("val_acc", acc, prog_bar=True)
         return loss
 
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(x)
+        loss = self.criterion(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        acc = (preds == y).float().mean()
+        self.log("test_loss", loss)
+        self.log("test_acc", acc)
+        return loss
+
     def configure_optimizers(self):
         optimizer_choice = self.hparams.optimizer_choice.lower()
         if optimizer_choice == "adam":
