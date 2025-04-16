@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import RichProgressBar
 from pytorch_lightning.callbacks import Callback
 import pprint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from utils.visualise import log_prediction_grid
 
 
 class EpochLoggerCallback(Callback):
@@ -21,7 +22,7 @@ class EpochLoggerCallback(Callback):
         val_acc = metrics.get("val_acc")
         print(f"Epoch {epoch}: val_loss={val_loss:.4f}, val_acc={val_acc:.4f}")
 
-def train_model(config, wandb_logger):
+def train_model(config, wandb_logger=None):
     # Set seed for reproducibility
     seed_everything(42)
 
@@ -32,10 +33,8 @@ def train_model(config, wandb_logger):
     verbose=True,
     mode="min"
     )
-
-    data_dir = "/home/gokul/LLM-Distillation/wino/DLAssign2/data"
     
-    data_loader = INaturalistDataLoader(data_dir=data_dir,
+    data_loader = INaturalistDataLoader(data_dir=config.data_dir,
                                          batch_size=config.batch_size,
                                          img_size=config.img_size, use_aug=config.use_aug)
     data_loader.setup()
@@ -85,11 +84,11 @@ def train_model(config, wandb_logger):
     )
     trainer.save_checkpoint(save_name)
 
-def test_model(config, filename =None):
+def test_model(config, filename =None, wandb_logger=None):
 
     if filename==None:
         filename = (
-        f"save/"
+        f"partA/save/"
         f"bs_{config.batch_size}_"
         f"epochs_{config.epochs}_"
         f"aug_{int(config.use_aug)}_"
@@ -104,6 +103,11 @@ def test_model(config, filename =None):
         f"best_model.ckpt"
         )
     
+
+    run_name = "test_" + filename.split("/")[-1].split(".ck")[0]
+
+    wandb.run.name = run_name
+    wandb.run.save()
     
     # Load the best model checkpoint
     model = CNNModel.load_from_checkpoint(filename, strict=False)
@@ -117,13 +121,20 @@ def test_model(config, filename =None):
     )
     datamodule.setup()
 
+    test_loader = datamodule.test_dataloader()
+
     # Evaluate on test data
     trainer = Trainer(
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        devices="auto"
+        devices="auto",
+        logger=wandb_logger
     )
     results = trainer.test(model, datamodule)
-    print("Test results:", results)
+
+    log_prediction_grid(model, test_loader, samples_per_class=3)
+    
+
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="DA6401 Assignment 2 - Part A")
@@ -186,76 +197,7 @@ if __name__ == "__main__":
     if args.mode == "train":
         train_model(config, wandb_logger)
     elif args.mode == "test":
-        test_model(config, args.load_file)
+        test_model(config, args.load_file, wandb_logger)
     
     wandb.finish() 
 
-
-# if __name__ == "__main__":
-#     main()
-    # sweep_config = {
-    #     'method': 'bayes',
-    #     # 'early_terminate': {
-    #     #     'type': 'hyperband',
-    #     #     'min_iter': 5,  
-    #     #     'max_iter': 10,  
-    #     #     'eta': 2,
-    #     # },
-    #     'metric': {
-    #         'name': 'val_acc',  
-    #         'goal': 'maximize'
-
-    #     },
-    #     'parameters': {
-    #         'epochs': {
-    #             'values': [30]   
-    #         },
-    #         'num_filters': {
-    #             'values': [[64, 64, 64, 64, 64], [32, 64, 128, 256, 512]]
-    #         },
-
-    #         'dense_neurons': {
-    #             'values': [256, 512]
-    #         },
-    #         'dropout_rate': {
-    #             'min': 0.0, 
-    #             'max': 0.1,
-    #         },
-    #         'kernel_size': {
-    #             'values': [3, 5]
-    #         },
-    #         'lr': {
-    #             'min': 1e-5,
-    #             'max': 4e-4,
-    #         },
-    #         'batch_size': {
-    #             'values': [16, 32, 64]
-    #         },
-    #         'conv_activation': {
-    #             'values': ['gelu', 'silu', 'mish']
-    #         },
-    #         'dense_activation': {
-    #             'values': ['relu', 'gelu']
-    #         },
-    #         'use_aug': {
-    #             'values': [True, False]
-    #         },
-    #         'use_batchnorm': {
-    #             'values': [True]
-    #         },
-    #         "weight_decay": {
-    #          "values": [0.001]
-    #         },
-    #         "optimizer": {
-    #             "values": ["nadam", "adamw"]
-    #         }
-    #     }
-    # }
-    # pprint.pprint(sweep_config)
-
-    # # Create the sweep – make sure to specify your wandb project and entity
-    # sweep_id = wandb.sweep(sweep_config, project="DA6401_Assignment2", entity="ns25z040-indian-institute-of-technology-madras")
-    # print("Sweep ID:", sweep_id)
-    # # sweep_id= "k4b46277"
-    # # Run the sweep agent, which calls your main training function
-    # wandb.agent(sweep_id, function=main, project="DA6401_Assignment2", entity="ns25z040-indian-institute-of-technology-madras")
