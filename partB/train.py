@@ -14,9 +14,9 @@ def main():
                         help="Pre-trained model to finetune")
     parser.add_argument("--data_dir", type=str, required=True,
                         help="Path to the iNaturalist dataset directory")
-    parser.add_argument("--wandb_project", type=str, default="DA6401_Assignment2",
+    parser.add_argument("--wandb_project", type=str, default="wandbproject",
                         help="Weights & Biases project name")
-    parser.add_argument("--wandb_entity", type=str, default="ns25z040-indian-institute-of-technology-madras",
+    parser.add_argument("--wandb_entity", type=str, default="wandbentity",
                         help="Weights & Biases entity name")
     parser.add_argument("--max_epochs", type=int, default=10,
                         help="Maximum number of epochs for training")
