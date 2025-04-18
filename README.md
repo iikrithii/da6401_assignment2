@@ -13,7 +13,7 @@ The objective of this assignment is to a CNN model from scratch and learn how to
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 ├── partA/                         # Training a CNN from scratch
@@ -77,7 +77,7 @@ The objective of this assignment is to a CNN model from scratch and learn how to
 
 ---
 
-## 📊 Results Summary
+## Results Summary
 
 ### Part A – Scratch‑trained CNN
 - **Best Validation Accuracy**: 48.05%  
