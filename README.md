@@ -54,7 +54,7 @@ The objective of this assignment is to a CNN model from scratch and learn how to
      ```
    - **Part B**:
      ```bash
-     cd ../partB
+     cd partB
      pip install -r requirements.txt
      ```
 
