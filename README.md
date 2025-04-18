@@ -33,7 +33,7 @@ The objective of this assignment is to a CNN model from scratch and learn how to
 │   ├── save/                      # Auto‑saved best checkpoints
 │   └── README.md                  # Detailed docs for Part B
 
-└── README.md                      # This overarching introduction & guide
+└── README.md                      # Introduction to the code repository and guide
 ```
 
 ---
