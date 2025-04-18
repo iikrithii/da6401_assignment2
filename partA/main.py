@@ -12,6 +12,8 @@ from pytorch_lightning.callbacks import Callback
 import pprint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from utils.visualise import log_prediction_grid
+from utils.visualise_layers import log_first_layer_filters
+from utils.guided_backprop import log_guided_backprop
 
 
 class EpochLoggerCallback(Callback):
@@ -33,8 +35,10 @@ def train_model(config, wandb_logger=None):
     verbose=True,
     mode="min"
     )
+
+    data_dir = "/home/gokul/LLM-Distillation/wino/DLAssign2/data"
     
-    data_loader = INaturalistDataLoader(data_dir=config.data_dir,
+    data_loader = INaturalistDataLoader(data_dir=data_dir,
                                          batch_size=config.batch_size,
                                          img_size=config.img_size, use_aug=config.use_aug)
     data_loader.setup()
@@ -88,7 +92,7 @@ def test_model(config, filename =None, wandb_logger=None):
 
     if filename==None:
         filename = (
-        f"partA/save/"
+        f"save/"
         f"bs_{config.batch_size}_"
         f"epochs_{config.epochs}_"
         f"aug_{int(config.use_aug)}_"
@@ -103,11 +107,6 @@ def test_model(config, filename =None, wandb_logger=None):
         f"best_model.ckpt"
         )
     
-
-    run_name = "test_" + filename.split("/")[-1].split(".ck")[0]
-
-    wandb.run.name = run_name
-    wandb.run.save()
     
     # Load the best model checkpoint
     model = CNNModel.load_from_checkpoint(filename, strict=False)
@@ -129,10 +128,19 @@ def test_model(config, filename =None, wandb_logger=None):
         devices="auto",
         logger=wandb_logger
     )
+
     results = trainer.test(model, datamodule)
 
-    log_prediction_grid(model, test_loader, samples_per_class=3)
+    log_prediction_grid(
+        model,
+        test_loader,
+        num_classes=10,
+        sort_by_confidence=False
+    )
+
+    log_first_layer_filters(model, test_loader)
     
+    log_guided_backprop(model, test_loader)
 
 
 
@@ -140,12 +148,12 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="DA6401 Assignment 2 - Part A")
     parser.add_argument("-m", "--mode", type=str, default="train", choices=["train", "test"],
                         help="Run mode: train or test")
-    parser.add_argument("-dd", "--data_dir", type=str, default="/home/gokul/LLM-Distillation/wino/DLAssign2/data",
+    parser.add_argument("-dd", "--data_dir", type=str, default="/data",
                         help="Path to the data directory")
     parser.add_argument("-img", "--img_size", type=int, default=256, help="Resized Image size for training/testing")
-    parser.add_argument("-wp", "--wandb_project", type=str, default="DA6401_Assignment2", 
+    parser.add_argument("-wp", "--wandb_project", type=str, default="wandbproject", 
                         help="WandB project name")
-    parser.add_argument("-we", "--wandb_entity", type=str, default="ns25z040-indian-institute-of-technology-madras", 
+    parser.add_argument("-we", "--wandb_entity", type=str, default="wandbentity", 
                         help="WandB entity (user or team)")
     parser.add_argument("-e", "--epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("-b", "--batch_size", type=int, default=32, help="Batch size for training/testing")
@@ -189,15 +197,26 @@ if __name__ == "__main__":
         f"optim_{config.optimizer}"
     )
     # Set the run name in WandB
-    wandb.run.name = run_name
-    wandb.run.save()
+    # wandb.run.name = run_name
+    # wandb.run.save()
     
-    wandb_logger = WandbLogger(project=args.wandb_project, log_model=False, name=run_name)
+    # wandb_logger = WandbLogger(project=args.wandb_project, log_model=False, name=run_name)
 
     if args.mode == "train":
+        # Set the run name in WandB
+        wandb.run.name = run_name
+        wandb.run.save()
+        wandb_logger = WandbLogger(project=args.wandb_project, log_model=False, name=run_name)
         train_model(config, wandb_logger)
     elif args.mode == "test":
+        # Set the run name in WandB
+        run_name = "test_" + args.load_file.split("/")[-1].split(".ck")[0]
+        wandb.run.name = run_name
+        wandb.run.save()
+        wandb_logger = WandbLogger(project=args.wandb_project, log_model=False, name=run_name)
         test_model(config, args.load_file, wandb_logger)
     
-    wandb.finish() 
+    if wandb.run:
+        wandb.run.finish()
+
 
