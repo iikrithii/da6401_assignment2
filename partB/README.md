@@ -74,10 +74,43 @@ pip install -r requirements.txt
 
 ---
 
+## Detailed CLI Reference
+
+All scripts use Python’s `argparse`:
+
+### `train.py` Arguments
+
+| Arg                 | Type             | Default       | Description                                                                                             |
+|---------------------|------------------|---------------|---------------------------------------------------------------------------------------------------------|
+| `--data_dir`        | `str`            | **Required**  | Path to root data folder (must contain `train/` & `val/`).                                                |
+| `--model_type`      | `str`            | `EfficientNet`| Choose backbone: `EfficientNet` or `ResNet`.                                                             |
+| `--img_size`        | `int`            | `224`         | Resize images to square dimensions.                                                                     |
+| `--batch_size`      | `int`            | `32`          | Batch size for train/val/test loaders.                                                                  |
+| `--num_workers`     | `int`            | `4`           | Number of CPU threads for data loading.                                                                 |
+| `--use_aug`         | `flag`           | `False`       | Enable flip/rotation augmentations in training.                                                         |
+| `--ft_strategy`     | `bool`           | `True`        | Apply fine‑tuning parameter freezing.                                                                   |
+| `--ft_type`         | `str`            | `last_layer`  | FT variant: `none`, `last_layer`, `last_block`, `full`.                                                 |
+| `--max_epochs`      | `int`            | `10`          | Maximum epochs for training.                                                                            |
+| `--wandb_project`   | `str`            | `wandbproject`| Project name on W&B for experiment logs.                                                                |
+| `--wandb_entity`    | `str`            | `wandbentity` | W&B team or user entity.                                                                                |
+
+### `test.py` Arguments
+
+| Arg                     | Type   | Default       | Description                                          |
+|-------------------------|--------|---------------|------------------------------------------------------|
+| `--model_checkpoint`    | `str`  | **Required**  | Path to the `.ckpt` to evaluate.                     |
+| `--data_dir`            | `str`  | **Required**  | Root data folder (same structure as training).       |
+| `--batch_size`          | `int`  | `16`          | Batch size for testing.                              |
+| `--num_workers`         | `int`  | `4`           | DataLoader workers.                                  |
+| `--img_size`            | `int`  | `224`         | Image resize dimension.                              |
+| `--wandb_project`       | `str`  | `wandbproject`| W&B project name for logging test metrics.           |
+| `--wandb_entity`        | `str`  | `wandbentity` | W&B entity/team.                                     |
+
+---
 
 ## Usage
 
-With data in place, run the CLI scripts below.
+With data in place, run the CLI scripts below using the sample CLI arguments above. Here are sample templates for the same.
 
 ### Training (`train.py`)
 
@@ -120,39 +153,6 @@ python test.py \
 
 ---
 
-## Detailed CLI Reference
-
-All scripts use Python’s `argparse`:
-
-### `train.py` Arguments
-
-| Arg                 | Type             | Default       | Description                                                                                             |
-|---------------------|------------------|---------------|---------------------------------------------------------------------------------------------------------|
-| `--data_dir`        | `str`            | **Required**  | Path to root data folder (must contain `train/` & `val/`).                                                |
-| `--model_type`      | `str`            | `EfficientNet`| Choose backbone: `EfficientNet` or `ResNet`.                                                             |
-| `--img_size`        | `int`            | `224`         | Resize images to square dimensions.                                                                     |
-| `--batch_size`      | `int`            | `32`          | Batch size for train/val/test loaders.                                                                  |
-| `--num_workers`     | `int`            | `4`           | Number of CPU threads for data loading.                                                                 |
-| `--use_aug`         | `flag`           | `False`       | Enable flip/rotation augmentations in training.                                                         |
-| `--ft_strategy`     | `bool`           | `True`        | Apply fine‑tuning parameter freezing.                                                                   |
-| `--ft_type`         | `str`            | `last_layer`  | FT variant: `none`, `last_layer`, `last_block`, `full`.                                                 |
-| `--max_epochs`      | `int`            | `10`          | Maximum epochs for training.                                                                            |
-| `--wandb_project`   | `str`            | `wandbproject`| Project name on W&B for experiment logs.                                                                |
-| `--wandb_entity`    | `str`            | `wandbentity` | W&B team or user entity.                                                                                |
-
-### `test.py` Arguments
-
-| Arg                     | Type   | Default       | Description                                          |
-|-------------------------|--------|---------------|------------------------------------------------------|
-| `--model_checkpoint`    | `str`  | **Required**  | Path to the `.ckpt` to evaluate.                     |
-| `--data_dir`            | `str`  | **Required**  | Root data folder (same structure as training).       |
-| `--batch_size`          | `int`  | `16`          | Batch size for testing.                              |
-| `--num_workers`         | `int`  | `4`           | DataLoader workers.                                  |
-| `--img_size`            | `int`  | `224`         | Image resize dimension.                              |
-| `--wandb_project`       | `str`  | `wandbproject`| W&B project name for logging test metrics.           |
-| `--wandb_entity`        | `str`  | `wandbentity` | W&B entity/team.                                     |
-
----
 
 ## Core Components Walkthrough
 
